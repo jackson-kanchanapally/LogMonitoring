@@ -7,8 +7,8 @@
 
 import { useEffect, useState } from "react"
 import type { SideBarProps, SortOption } from "./types"
-import { DEFAULT_LOGS } from "./constants"
-import { useFilteredLogs } from "./hooks"
+import { ALL_FILTER_VALUE, DEFAULT_LOGS } from "./constants"
+import { useFilteredLogs, useLogFilterOptions } from "./hooks"
 import { SideBarHeader } from "./SideBarHeader"
 import { SearchBar } from "./SearchBar"
 import { FilterControls } from "./FilterControls"
@@ -28,18 +28,22 @@ export default function SideBar({
 }: SideBarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<SortOption>("frequency")
-  const [apiName, setApiName] = useState("all")
-  const [serviceName, setServiceName] = useState("all")
+  const [apiName, setApiName] = useState(ALL_FILTER_VALUE)
+  const [serviceName, setServiceName] = useState(ALL_FILTER_VALUE)
   const [internalSelectedLogId, setInternalSelectedLogId] = useState(
     selectedLogId ?? logs[0]?.id
   )
+  const { apiNames, serviceNames } = useLogFilterOptions(logs)
+  const selectedApiName = apiName === ALL_FILTER_VALUE ? "" : apiName
+  const selectedServiceName =
+    serviceName === ALL_FILTER_VALUE ? "" : serviceName
 
   const filteredAndSortedLogs = useFilteredLogs({
     logs,
     searchQuery,
     sortBy,
-    apiName: apiName === "all" ? "" : apiName,
-    serviceName: serviceName === "all" ? "" : serviceName,
+    apiName: selectedApiName,
+    serviceName: selectedServiceName,
   })
 
   const activeSelectedLogId = selectedLogId ?? internalSelectedLogId
@@ -81,13 +85,14 @@ export default function SideBar({
 
         <div className="mt-4">
           <FilterControls
-            logs={logs}
             sortBy={sortBy}
             onSortChange={setSortBy}
             apiName={apiName}
             onApiNameChange={setApiName}
             serviceName={serviceName}
             onServiceNameChange={setServiceName}
+            apiOptions={apiNames}
+            serviceOptions={serviceNames}
           />
         </div>
 

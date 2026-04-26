@@ -1,5 +1,5 @@
 /**
- * Custom hook for filtering and sorting logs
+ * Hooks for sidebar filtering, sorting, and filter option generation.
  */
 
 import { useMemo } from "react"
@@ -12,6 +12,53 @@ interface UseFilteredLogsParams {
   apiName: string
   serviceName: string
 }
+
+const getSearchableValues = (log: Log) => [
+  log.name,
+  log.package,
+  log.apiServiceName ?? "",
+  log.serviceName ?? "",
+]
+
+const matchesSearchQuery = (log: Log, normalizedQuery: string) => {
+  if (!normalizedQuery) {
+    return true
+  }
+
+  return getSearchableValues(log).some((value) =>
+    value.toLowerCase().includes(normalizedQuery)
+  )
+}
+
+const matchesExactFilter = (value: string, selectedValue: string) => {
+  if (!selectedValue) {
+    return true
+  }
+
+  return value.toLowerCase() === selectedValue
+}
+
+const sortLogs = (logs: Log[], sortBy: SortOption) => {
+  const sortedLogs = [...logs]
+
+  sortedLogs.sort((a, b) => {
+    switch (sortBy) {
+      case "frequency":
+        return b.occurrences - a.occurrences
+      case "recent":
+        return new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+      case "impact":
+        return b.userCount - a.userCount
+      default:
+        return 0
+    }
+  })
+
+  return sortedLogs
+}
+
+const getUniqueSortedOptions = (values: string[]) =>
+  Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b))
 
 /**
  * Hook to filter and sort logs based on search query and sort option
@@ -28,41 +75,31 @@ export const useFilteredLogs = ({
     const normalizedApiName = apiName.toLowerCase()
     const normalizedServiceName = serviceName.toLowerCase()
 
-    let filtered = logs.filter(
-      (log) => {
-        const matchesSearch =
-          log.name.toLowerCase().includes(normalizedQuery) ||
-          log.package.toLowerCase().includes(normalizedQuery) ||
-          (log.apiServiceName ?? "").toLowerCase().includes(normalizedQuery) ||
-          (log.serviceName ?? "").toLowerCase().includes(normalizedQuery)
+    const filteredLogs = logs.filter((log) => {
+      const resolvedApiName = log.apiServiceName ?? log.name
+      const resolvedServiceName = log.serviceName ?? log.package
 
-        const matchesApiName =
-          !normalizedApiName ||
-          (log.apiServiceName ?? log.name).toLowerCase() === normalizedApiName
-
-        const matchesServiceName =
-          !normalizedServiceName ||
-          (log.serviceName ?? log.package).toLowerCase() ===
-            normalizedServiceName
-
-        return matchesSearch && matchesApiName && matchesServiceName
-      }
-    )
-
-    // Sort logs by selected option
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "frequency":
-          return b.occurrences - a.occurrences
-        case "recent":
-          return new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
-        case "impact":
-          return b.userCount - a.userCount
-        default:
-          return 0
-      }
+      return (
+        matchesSearchQuery(log, normalizedQuery) &&
+        matchesExactFilter(resolvedApiName, normalizedApiName) &&
+        matchesExactFilter(resolvedServiceName, normalizedServiceName)
+      )
     })
 
-    return filtered
+    return sortLogs(filteredLogs, sortBy)
   }, [apiName, logs, searchQuery, serviceName, sortBy])
+}
+
+export const useLogFilterOptions = (logs: Log[]) => {
+  return useMemo(
+    () => ({
+      apiNames: getUniqueSortedOptions(
+        logs.map((log) => log.apiServiceName ?? log.name)
+      ),
+      serviceNames: getUniqueSortedOptions(
+        logs.map((log) => log.serviceName ?? log.package)
+      ),
+    }),
+    [logs]
+  )
 }
